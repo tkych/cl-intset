@@ -1,3 +1,13 @@
+Version 0.1.01
+2013-10-08
+Fixed Bug: intset:map, :desc?.
+         : intset:random, incorrect return value.
+Renamed  : integers->intset -> list->intset,
+         : intset->integers -> intset->list.
+Added    : function singletonp,
+         : nickname :iset.
+Kaizen   : test.lisp, doc, etc.
+
 Version 0.1.00
 2013-10-07
 Initial Release

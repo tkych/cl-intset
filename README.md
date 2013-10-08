@@ -1,26 +1,26 @@
-Last modified: 2013-10-07 23:40:59 tkych
+Last modified: 2013-10-08 19:23:46 tkych
 
-Version: 0.1.00 (beta)
+Version: 0.1.01 (beta)
 
 
 cl-intset
 =========
 
-cl-intset is a library for a set of a non-negative integers.
+cl-intset is a library for non-negative integer sets.
 
 
 Depends-on
 ----------
 
-- NIL
+ - NIL
 
 
 Installation
 ------------
 
-0. SHELL$   `git clone https://github.com/tkych/cl-intset`
-1. CL-REPL> `(push #p"/path-to-cl-intset/cl-intset/" asdf:*central-registry*)`
-2. CL-REPL> `(ql:quickload :cl-intset)` or `(asdf:load-system :cl-intset)`
+ 0. SHELL$   `git clone https://github.com/tkych/cl-intset`
+ 1. CL-REPL> `(push #p"/path-to-cl-intset/cl-intset/" asdf:*central-registry*)`
+ 2. CL-REPL> `(ql:quickload :cl-intset)` or `(asdf:load-system :cl-intset)`
 
 
 Examples

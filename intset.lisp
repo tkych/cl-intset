@@ -1,4 +1,4 @@
-;;;; Last modified: 2013-10-07 23:36:39 tkych
+;;;; Last modified: 2013-10-08 19:24:01 tkych
 
 ;; cl-intset/intset.lisp
 
@@ -14,7 +14,7 @@
 (in-package :cl-user)
 
 (defpackage #:cl-intset
-  (:nicknames #:intset)
+  (:nicknames #:intset #:iset)
   (:use :cl)
   (:shadow :subsetp :remove :delete :random :map :max :min
            :intersection :nintersection :union :nunion :set-difference
@@ -23,6 +23,7 @@
            #:make-intset
            #:intsetp
            #:emptyp
+           #:singletonp
            #:copy
            #:size
            #:clear
@@ -34,8 +35,8 @@
            #:insert
            #:remove
            #:delete
-           #:integers->intset
-           #:intset->integers
+           #:list->intset
+           #:intset->list
            #:intersection
            #:nintersection
            #:set-difference
@@ -56,20 +57,27 @@
 
 ;;--------------------------------------------------------------------
 
+;; <intset> ::= [<bitmap>]
+;; <bitmap> ::= (integer 0 *), e.g. 42 (<=> #b101010) ~ {1 3 5}
+
 (defstruct (intset (:constructor make-intset ())
                    (:copier nil)
+                   (:conc-name nil)
                    (:print-function
                     (lambda (obj stream depth)
                       (declare (ignore depth))
                       (print-unreadable-object
                           (obj stream :type t :identity t)))))
-  (bits 0 :type (integer 0 *)))
+  (bitmap 0 :type (integer 0 *)))
 
-(defmacro make-new-intset (init)
+(setf (documentation 'make-intset 'function)
+      "MAKE-INTSET => new-intset")
+
+(defmacro make-new-intset (init-bitmap)
   (let ((new-intset (gensym "NEW-INTSET-")))
-   `(let ((,new-intset (make-intset)))
-      (setf (intset-bits ,new-intset) ,init)
-      ,new-intset)))
+    `(let ((,new-intset (make-intset)))
+       (setf (bitmap ,new-intset) ,init-bitmap)
+       ,new-intset)))
 
 (defun intsetp (object)
   "INTSETP object => boolean"
@@ -77,20 +85,32 @@
 
 (defun emptyp (intset)
   "EMPTYP intset => boolean"
-  (zerop (intset-bits intset)))
+  (zerop (bitmap intset)))
+
+(defun singletonp (intset)
+  "SINGLETONP intset => boolean"
+  ;; MEMO: 2013-10-08 tkych
+  ;; The formula [ x & (x-1) ] remove the rightmost 1 from x.
+  ;; If x is #b0, then return #b0.
+  ;; e.g. (logand #b101010 (1- #b101010)) => #b101000
+  ;; c.f. Hacker's Delight, 2-1
+  ;; c.f. TAOCP, vol. 4A, p.140, (36)
+  (let ((bm (bitmap intset)))
+    (and (not (zerop bm))
+         (zerop (logand bm (1- bm))))))
 
 (defun copy (intset)
   "COPY intset => new-intset"
-  (make-new-intset (intset-bits intset)))
+  (make-new-intset (bitmap intset)))
 
 (defun clear (intset)
   "CLEAR intset => modified-intset"
-  (setf (intset-bits intset) 0)
+  (setf (bitmap intset) 0)
   intset)
 
 (defun size (intset)
   "SIZE intset => integer"
-  (logcount (intset-bits intset)))
+  (logcount (bitmap intset)))
 
 (defun memberp (integer intset)
   "MEMBERP integer intset => boolean"
@@ -98,42 +118,42 @@
   ;; Should signal an error of type type-error if logbitp's index is not
   ;; a non-negative integer.
   ;; see. CLHS, Function logbitp and Error Terminology
-  (and (logbitp integer (intset-bits intset))
+  (and (logbitp integer (bitmap intset))
        t))  ; ensure-boolean, c.f. quickutil
 
 (defun set-equal (intset1 intset2)
   "SET-EQUAL intset1 intset2 => boolean"
-  (= (intset-bits intset1) (intset-bits intset2)))
+  (= (bitmap intset1) (bitmap intset2)))
 
 (defun intset:subsetp (intset1 intset2)
   "intset:SUBSETP intset1 intset2 => boolean
-If `intset1' is a subset of `intset2', then return T, otherwise NIL."
-  (let ((bits1 (intset-bits intset1))
-        (bits2 (intset-bits intset2)))
-    (= bits1 (logand bits1 bits2))))
+If `intset1' is a subset of `intset2', it returns T, otherwise NIL."
+  (let ((bm1 (bitmap intset1))
+        (bm2 (bitmap intset2)))
+    (= bm1 (logand bm1 bm2))))
 
 (defun proper-subset-p (intset1 intset2)
   "PROPER-SUBSET-P intset1 intset2 => boolean
-If `intset1' is a proper subset of `intset2', then return T,
+If `intset1' is a proper subset of `intset2', it returns T,
 otherwise NIL."
-  (let ((bits1 (intset-bits intset1))
-        (bits2 (intset-bits intset2)))
-    (and (/= bits1 bits2)
-         (= bits1 (logand bits1 bits2)))))
+  (let ((bm1 (bitmap intset1))
+        (bm2 (bitmap intset2)))
+    (and (/= bm1 bm2)
+         (= bm1 (logand bm1 bm2)))))
 
 (defun add (integer intset)
   "ADD integer intset => new-intset
 If `integer' is not a non-negative integer, it signals a type-error."
   (check-type integer (integer 0 *))
-  (make-new-intset (logior (intset-bits intset)
+  (make-new-intset (logior (bitmap intset)
                            (ash 2 (1- integer)))))
 
 (defun insert (integer intset)
   "INSERT integer intset => modified-intset
 If `integer' is not a non-negative integer, it signals a type-error."
   (check-type integer (integer 0 *))
-  (setf (intset-bits intset)
-        (logior (intset-bits intset)
+  (setf (bitmap intset)
+        (logior (bitmap intset)
                 (ash 2 (1- integer))))
   intset)
 
@@ -141,20 +161,20 @@ If `integer' is not a non-negative integer, it signals a type-error."
   "intset:REMOVE integer intset => new-intset
 If `integer' is not a non-negative integer, it signals a type-error."
   (check-type integer (integer 0 *))
-  (make-new-intset (logandc2 (intset-bits intset)
+  (make-new-intset (logandc2 (bitmap intset)
                              (ash 2 (1- integer)))))
 
 (defun intset:delete (integer intset)
   "intset:DELETE integer intset => modified-intset
 If `integer' is not a non-negative integer, it signals a type-error."
   (check-type integer (integer 0 *))
-  (setf (intset-bits intset)
-        (logandc2 (intset-bits intset)
+  (setf (bitmap intset)
+        (logandc2 (bitmap intset)
                   (ash 2 (1- integer))))
   intset)
 
-(defun integers->intset (integers)
-  "INTEGERS->INTSET list-of-integers => intset
+(defun list->intset (integers)
+  "LIST->INTSET list-of-integers => new-intset
 If `integers' contains an element which is not a non-negative integer,
 it signals a type-error."
   (make-new-intset
@@ -163,51 +183,51 @@ it signals a type-error."
              (logior x (ash 2 (1- y))))
            integers :initial-value 0)))
 
-(defun intset->integers (intset &key (desc? nil))
-  "INTSET->INTEGERS intset &key (desc? nil) => list
+(defun intset->list (intset &key (desc? nil))
+  "INTSET->LIST intset &key (desc? nil) => list
 If keyword `desc?' is a non-NIL, return descending-ordered-list,
 otherwise ascending-ordered-list."
-  (let ((bits (intset-bits intset)))
+  (let ((bm (bitmap intset)))
     (if desc?
-        (loop :for i :downfrom (1- (integer-length bits)) :to 0
-              :when (logbitp i bits)
+        (loop :for i :downfrom (1- (integer-length bm)) :to 0
+              :when (logbitp i bm)
                 :collect i)
-        (loop :for i :from 0 :below (integer-length bits)
-              :when (logbitp i bits)
+        (loop :for i :from 0 :below (integer-length bm)
+              :when (logbitp i bm)
                 :collect i))))
 
 (defun intset:intersection (intset1 intset2)
   "intset:INTERSECTION intset1 intset2 => new-intset"
-  (make-new-intset (logand (intset-bits intset1)
-                           (intset-bits intset2))))
+  (make-new-intset (logand (bitmap intset1)
+                           (bitmap intset2))))
 
 (defun intset:nintersection (intset1 intset2)
   "intset:NINTERSECTION intset1 intset2 => modified-intset1"
   ;; MEMO: 2013-10-07 tkych
   ;; nintersection can modify list-1, but not list-2.
   ;; see. CLHS, function nintersection
-  (setf (intset-bits intset1) (logand (intset-bits intset1)
-                                      (intset-bits intset2)))
+  (setf (bitmap intset1) (logand (bitmap intset1)
+                                 (bitmap intset2)))
   intset1)
 
 (defun intset:set-difference (intset1 intset2)
   "intset:SET-DIFFERENCE intset1 intset2 => new-intset"
-  (make-new-intset (logandc2 (intset-bits intset1)
-                             (intset-bits intset2))))
+  (make-new-intset (logandc2 (bitmap intset1)
+                             (bitmap intset2))))
 
 (defun intset:nset-difference (intset1 intset2)
   "intset:NSET-DIFFERENCE intset1 intset2 => modified-intset1"
   ;; MEMO: 2013-10-07 tkych
   ;; nset-difference may destroy list-1.
   ;; see. CLHS, function nset-difference
-  (setf (intset-bits intset1) (logandc2 (intset-bits intset1)
-                                        (intset-bits intset2)))
+  (setf (bitmap intset1) (logandc2 (bitmap intset1)
+                                   (bitmap intset2)))
   intset1)
 
 (defun intset:union (intset1 intset2)
   "intset:UNION intset1 intset2 => new-intset"
-  (make-new-intset (logior (intset-bits intset1)
-                           (intset-bits intset2))))
+  (make-new-intset (logior (bitmap intset1)
+                           (bitmap intset2))))
 
 (defun intset:nunion (intset1 intset2)
   "intset:NUNION intset1 intset2 => modified-intset1"
@@ -215,14 +235,14 @@ otherwise ascending-ordered-list."
   ;; nunion is permitted to modify any part, car or cdr, of the list
   ;; structure of list-1 or list-2.
   ;; see. CLHS, function nunion
-  (setf (intset-bits intset1) (logior (intset-bits intset1)
-                                      (intset-bits intset2)))
+  (setf (bitmap intset1) (logior (bitmap intset1)
+                                 (bitmap intset2)))
   intset1)
 
 (defun intset:set-exclusive-or (intset1 intset2)
   "intset:SET-EXCLUSIVE-OR intset1 intset2 => new-intset"
-  (make-new-intset (logxor (intset-bits intset1)
-                           (intset-bits intset2))))
+  (make-new-intset (logxor (bitmap intset1)
+                           (bitmap intset2))))
 
 (defun intset:nset-exclusive-or (intset1 intset2)
   "intset:NSET-EXCLUSIVE-OR intset1 intset2 => modified-intset1"
@@ -230,24 +250,23 @@ otherwise ascending-ordered-list."
   ;; nset-exclusive-or is permitted to modify any part, car or cdr, of
   ;; the list structure of list-1 or list-2.
   ;; see. CLHS, function nset-exclusive-or
-  (setf (intset-bits intset1) (logxor (intset-bits intset1)
-                                      (intset-bits intset2)))
+  (setf (bitmap intset1) (logxor (bitmap intset1)
+                                 (bitmap intset2)))
   intset1)
 
-;; !!! UGLY:
 (defun intset:random (intset)
   "intset:RANDOM intset => integer/null
 If `intset' is an empty set, it returns NIL."
   (if (emptyp intset)
       nil
-      (let* ((bits (intset-bits intset))
-             (size (logcount bits))
+      (let* ((bm   (bitmap intset))
+             (size (logcount bm))
              (nth  (cl:random size)))
-        (loop :for i :from 0 :below (integer-length bits)
-              :with j := 0
+        (loop :for i :from 0 :to (integer-length bm)
+              :with j := -1
               :do (when (= j nth)
-                    (RETURN i))
-                  (when (logbitp i bits)
+                    (RETURN (1- i)))
+                  (when (logbitp i bm)
                     (incf j))))))
 
 (defun intset:map (type function intset &key (desc? nil))
@@ -259,51 +278,59 @@ otherwise ascending-ordered."
   (check-type type     (member intset list string vector))
   (check-type function function)
   (if (eq type 'intset)
-      (loop :with bits0 := (intset-bits intset)
-            :with bits1 := 0
-            :for i :from 0 :below (integer-length bits0)
-            :when (logbitp i bits0)
-              :do (setf bits1
-                        (logior bits1
-                                (ash 2 (1- (funcall function i)))))
-            :finally (return (make-new-intset bits1)))
-      (cl:map type function (intset->integers intset :desc? desc?))))
+      (let ((bm (bitmap intset))
+            (new-bm 0))
+        (if desc?
+            (loop :for i :downfrom (1- (integer-length bm)) :to 0
+                  :do (when (logbitp i bm)
+                        (setf new-bm
+                              (logior new-bm
+                                      (ash 2 (1- (funcall function i)))))))
+            (loop :for i :from 0 :below (integer-length bm)
+                  :do (when (logbitp i bm)
+                        (setf new-bm
+                              (logior new-bm
+                                      (ash 2 (1- (funcall function i))))))))
+        (make-new-intset new-bm))
+      (cl:map type function (intset->list intset :desc? desc?))))
 
 (defun for-each (function intset &key (desc? nil))
   "FOR-EACH function intset => non-modified-intset
 If keyword `desc?' is a non-NIL, it calls `function' with
 descending-ordered arguments, otherwise ascending-ordered."
   (check-type function function)
-  (let ((bits (intset-bits intset)))
+  (let ((bm (bitmap intset)))
     (if desc?
-        (loop :for i :downfrom (1- (integer-length bits)) :to 0
-              :do (when (logbitp i bits)
+        (loop :for i :downfrom (1- (integer-length bm)) :to 0
+              :do (when (logbitp i bm)
                     (funcall function i)))
-        (dotimes (i (integer-length bits))
-          (when (logbitp i bits)
-            (funcall function i)))))
+        (loop :for i :from 0 :below (integer-length bm)
+              :do (when (logbitp i bm)
+                    (funcall function i)))))
   intset)
 
 (defun intset:max (intset)
   "intset:MAX intset => integer/null
 If `intset' is an empty set, it returns NIL."
-  (if (emptyp intset)
-      nil
-      (1- (integer-length (intset-bits intset)))))
+  (let ((bm (bitmap intset)))
+    (if (zerop bm)
+        nil
+        (1- (integer-length bm)))))
 
 (defun intset:min (intset)
   "intset:MIN intset => integer/null
 If `intset' is an empty set, it returns NIL."
-  (if (emptyp intset)
-      nil
-      (let* ((bits (intset-bits intset))
-             ;; MEMO: 2013-10-07 tkych
-             ;; The formula [ x & -x ] extracts the rightmost 1 from x.
-             ;; e.g. (logand #b101010 (- #b101010)) => #b10
-             ;; c.f. Hacker's Delight, 2-1
-             ;; c.f. TAOCP, vol. 4A, p.140, (37)
-             (rightmost1 (logand bits (- bits))))
-        (1- (integer-length rightmost1)))))
+  (let ((bm (bitmap intset)))
+    (if (zerop bm)
+        nil
+        ;; MEMO: 2013-10-07 tkych
+        ;; The formula [ x & -x ] extracts the rightmost 1 from x.
+        ;; If x is #b0, then return #b0.
+        ;; e.g. (logand #b101010 (- #b101010)) => #b10
+        ;; c.f. Hacker's Delight, 2-1
+        ;; c.f. TAOCP, vol. 4A, p.140, (37)
+        (let ((rightmost1 (logand bm (- bm))))
+          (1- (integer-length rightmost1))))))
 
 
 ;;====================================================================

@@ -1,4 +1,4 @@
-;;;; Last modified: 2013-10-07 23:41:21 tkych
+;;;; Last modified: 2013-10-08 19:23:54 tkych
 
 ;; cl-intset/cl-intset.asd
 
@@ -25,8 +25,8 @@
 
 (asdf:defsystem #:cl-intset
   :name        "cl-intset"
-  :description "Library for a set of a non-negative integers."
-  :version     "0.1.00"
+  :description "A library for non-negative integer sets."
+  :version     "0.1.01"
   :licence     "MIT License"
   :author      "Takaya OCHIAI <tkych.repl@gmail.com>" 
   :components  ((:file "intset"))
