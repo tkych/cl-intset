@@ -1,4 +1,4 @@
-;;;; Last modified: 2013-10-08 19:24:01 tkych
+;;;; Last modified: 2013-10-08 20:55:33 tkych
 
 ;; cl-intset/intset.lisp
 
@@ -56,7 +56,7 @@
 
 
 ;;--------------------------------------------------------------------
-
+;;
 ;; <intset> ::= [<bitmap>]
 ;; <bitmap> ::= (integer 0 *), e.g. 42 (<=> #b101010) ~ {1 3 5}
 
@@ -71,7 +71,8 @@
   (bitmap 0 :type (integer 0 *)))
 
 (setf (documentation 'make-intset 'function)
-      "MAKE-INTSET => new-intset")
+      "MAKE-INTSET => new-intset
+It returns a new empty intset.")
 
 (defmacro make-new-intset (init-bitmap)
   (let ((new-intset (gensym "NEW-INTSET-")))
@@ -89,7 +90,7 @@
 
 (defun singletonp (intset)
   "SINGLETONP intset => boolean"
-  ;; MEMO: 2013-10-08 tkych
+  ;; MEMO: 2013-10-08
   ;; The formula [ x & (x-1) ] remove the rightmost 1 from x.
   ;; If x is #b0, then return #b0.
   ;; e.g. (logand #b101010 (1- #b101010)) => #b101000
@@ -114,7 +115,7 @@
 
 (defun memberp (integer intset)
   "MEMBERP integer intset => boolean"
-  ;; MEMO: 2013-10-06 tkych
+  ;; MEMO: 2013-10-06
   ;; Should signal an error of type type-error if logbitp's index is not
   ;; a non-negative integer.
   ;; see. CLHS, Function logbitp and Error Terminology
@@ -203,7 +204,7 @@ otherwise ascending-ordered-list."
 
 (defun intset:nintersection (intset1 intset2)
   "intset:NINTERSECTION intset1 intset2 => modified-intset1"
-  ;; MEMO: 2013-10-07 tkych
+  ;; MEMO: 2013-10-07
   ;; nintersection can modify list-1, but not list-2.
   ;; see. CLHS, function nintersection
   (setf (bitmap intset1) (logand (bitmap intset1)
@@ -217,7 +218,7 @@ otherwise ascending-ordered-list."
 
 (defun intset:nset-difference (intset1 intset2)
   "intset:NSET-DIFFERENCE intset1 intset2 => modified-intset1"
-  ;; MEMO: 2013-10-07 tkych
+  ;; MEMO: 2013-10-07
   ;; nset-difference may destroy list-1.
   ;; see. CLHS, function nset-difference
   (setf (bitmap intset1) (logandc2 (bitmap intset1)
@@ -231,7 +232,7 @@ otherwise ascending-ordered-list."
 
 (defun intset:nunion (intset1 intset2)
   "intset:NUNION intset1 intset2 => modified-intset1"
-  ;; MEMO: 2013-10-07 tkych
+  ;; MEMO: 2013-10-07
   ;; nunion is permitted to modify any part, car or cdr, of the list
   ;; structure of list-1 or list-2.
   ;; see. CLHS, function nunion
@@ -246,7 +247,7 @@ otherwise ascending-ordered-list."
 
 (defun intset:nset-exclusive-or (intset1 intset2)
   "intset:NSET-EXCLUSIVE-OR intset1 intset2 => modified-intset1"
-  ;; MEMO: 2013-10-07 tkych
+  ;; MEMO: 2013-10-07
   ;; nset-exclusive-or is permitted to modify any part, car or cdr, of
   ;; the list structure of list-1 or list-2.
   ;; see. CLHS, function nset-exclusive-or
@@ -270,7 +271,7 @@ If `intset' is an empty set, it returns NIL."
                     (incf j))))))
 
 (defun intset:map (type function intset &key (desc? nil))
-  "intset:MAP type function intset => result-object
+  "intset:MAP type function intset => new-object
 The argument `type' must be a one of {intset list string vector}.
 If `type' is intset, then it returns a new intset. If keyword `desc?'
 is a non-NIL, it calls `function' with descending-ordered arguments,
@@ -323,7 +324,7 @@ If `intset' is an empty set, it returns NIL."
   (let ((bm (bitmap intset)))
     (if (zerop bm)
         nil
-        ;; MEMO: 2013-10-07 tkych
+        ;; MEMO: 2013-10-07
         ;; The formula [ x & -x ] extracts the rightmost 1 from x.
         ;; If x is #b0, then return #b0.
         ;; e.g. (logand #b101010 (- #b101010)) => #b10
