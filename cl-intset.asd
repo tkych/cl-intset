@@ -1,4 +1,4 @@
-;;;; Last modified: 2013-10-08 19:23:54 tkych
+;;;; Last modified: 2013-10-09 19:14:19 tkych
 
 ;; cl-intset/cl-intset.asd
 
@@ -25,7 +25,8 @@
 
 (asdf:defsystem #:cl-intset
   :name        "cl-intset"
-  :description "A library for non-negative integer sets."
+  :description "A library for non-negative integer sets.
+It implements sets using bitsets."
   :version     "0.1.01"
   :licence     "MIT License"
   :author      "Takaya OCHIAI <tkych.repl@gmail.com>" 

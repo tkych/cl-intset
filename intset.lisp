@@ -1,4 +1,4 @@
-;;;; Last modified: 2013-10-08 20:55:33 tkych
+;;;; Last modified: 2013-10-09 19:14:41 tkych
 
 ;; cl-intset/intset.lisp
 
@@ -25,8 +25,8 @@
            #:emptyp
            #:singletonp
            #:copy
-           #:size
            #:clear
+           #:size
            #:memberp
            #:set-equal
            #:subsetp
@@ -74,11 +74,11 @@
       "MAKE-INTSET => new-intset
 It returns a new empty intset.")
 
-(defmacro make-new-intset (init-bitmap)
-  (let ((new-intset (gensym "NEW-INTSET-")))
-    `(let ((,new-intset (make-intset)))
-       (setf (bitmap ,new-intset) ,init-bitmap)
-       ,new-intset)))
+(declaim (inline make-new-intset))
+(defun make-new-intset (init-bitmap)
+  (let ((new-intset (make-intset)))
+    (setf (bitmap new-intset) init-bitmap)
+    new-intset))
 
 (defun intsetp (object)
   "INTSETP object => boolean"
@@ -110,16 +110,16 @@ It returns a new empty intset.")
   intset)
 
 (defun size (intset)
-  "SIZE intset => integer"
+  "SIZE intset => non-negative-integer"
   (logcount (bitmap intset)))
 
-(defun memberp (integer intset)
-  "MEMBERP integer intset => boolean"
+(defun memberp (non-negative-integer intset)
+  "MEMBERP non-negative-integer intset => boolean"
   ;; MEMO: 2013-10-06
   ;; Should signal an error of type type-error if logbitp's index is not
   ;; a non-negative integer.
-  ;; see. CLHS, Function logbitp and Error Terminology
-  (and (logbitp integer (bitmap intset))
+  ;; c.f. CLHS, Function logbitp and Error Terminology
+  (and (logbitp non-negative-integer (bitmap intset))
        t))  ; ensure-boolean, c.f. quickutil
 
 (defun set-equal (intset1 intset2)
@@ -142,50 +142,54 @@ otherwise NIL."
     (and (/= bm1 bm2)
          (= bm1 (logand bm1 bm2)))))
 
-(defun add (integer intset)
-  "ADD integer intset => new-intset
-If `integer' is not a non-negative integer, it signals a type-error."
-  (check-type integer (integer 0 *))
+(defun add (non-negative-integer intset)
+  "ADD non-negative-integer intset => new-intset
+If `non-negative-integer' is not a non-negative integer, it signals a
+type-error."
+  (check-type non-negative-integer (integer 0 *))
   (make-new-intset (logior (bitmap intset)
-                           (ash 2 (1- integer)))))
+                           (ash 2 (1- non-negative-integer)))))
 
-(defun insert (integer intset)
-  "INSERT integer intset => modified-intset
-If `integer' is not a non-negative integer, it signals a type-error."
-  (check-type integer (integer 0 *))
+(defun insert (non-negative-integer intset)
+  "INSERT non-negative-integer intset => modified-intset
+If `non-negative-integer' is not a non-negative integer, it signals a
+type-error."
+  (check-type non-negative-integer (integer 0 *))
   (setf (bitmap intset)
         (logior (bitmap intset)
-                (ash 2 (1- integer))))
+                (ash 2 (1- non-negative-integer))))
   intset)
 
-(defun intset:remove (integer intset)
-  "intset:REMOVE integer intset => new-intset
-If `integer' is not a non-negative integer, it signals a type-error."
-  (check-type integer (integer 0 *))
+(defun intset:remove (non-negative-integer intset)
+  "intset:REMOVE non-negative-integer intset => new-intset
+If `non-negative-integer' is not a non-negative integer, it signals a
+type-error."
+  (check-type non-negative-integer (integer 0 *))
   (make-new-intset (logandc2 (bitmap intset)
-                             (ash 2 (1- integer)))))
+                             (ash 2 (1- non-negative-integer)))))
 
-(defun intset:delete (integer intset)
-  "intset:DELETE integer intset => modified-intset
-If `integer' is not a non-negative integer, it signals a type-error."
-  (check-type integer (integer 0 *))
+(defun intset:delete (non-negative-integer intset)
+  "intset:DELETE non-negative-integer intset => modified-intset
+If `non-negative-integer' is not a non-negative integer, it signals a
+type-error."
+  (check-type non-negative-integer (integer 0 *))
   (setf (bitmap intset)
         (logandc2 (bitmap intset)
-                  (ash 2 (1- integer))))
+                  (ash 2 (1- non-negative-integer))))
   intset)
 
-(defun list->intset (integers)
-  "LIST->INTSET list-of-integers => new-intset
-If `integers' contains an element which is not a non-negative integer,
-it signals a type-error."
+(defun list->intset (non-negative-integers)
+  "LIST->INTSET non-negative-integer-list => new-intset
+If `non-negative-integers' contains an element which is not
+a non-negative integer, it signals a type-error."
   (make-new-intset
    (reduce (lambda (x y)
              (check-type y (integer 0 *))
              (logior x (ash 2 (1- y))))
-           integers :initial-value 0)))
+           non-negative-integers :initial-value 0)))
 
 (defun intset->list (intset &key (desc? nil))
-  "INTSET->LIST intset &key (desc? nil) => list
+  "INTSET->LIST intset &key (desc? nil) => non-negative-integer-list
 If keyword `desc?' is a non-NIL, return descending-ordered-list,
 otherwise ascending-ordered-list."
   (let ((bm (bitmap intset)))
@@ -206,7 +210,7 @@ otherwise ascending-ordered-list."
   "intset:NINTERSECTION intset1 intset2 => modified-intset1"
   ;; MEMO: 2013-10-07
   ;; nintersection can modify list-1, but not list-2.
-  ;; see. CLHS, function nintersection
+  ;; c.f. CLHS, function nintersection
   (setf (bitmap intset1) (logand (bitmap intset1)
                                  (bitmap intset2)))
   intset1)
@@ -220,7 +224,7 @@ otherwise ascending-ordered-list."
   "intset:NSET-DIFFERENCE intset1 intset2 => modified-intset1"
   ;; MEMO: 2013-10-07
   ;; nset-difference may destroy list-1.
-  ;; see. CLHS, function nset-difference
+  ;; c.f. CLHS, function nset-difference
   (setf (bitmap intset1) (logandc2 (bitmap intset1)
                                    (bitmap intset2)))
   intset1)
@@ -235,7 +239,7 @@ otherwise ascending-ordered-list."
   ;; MEMO: 2013-10-07
   ;; nunion is permitted to modify any part, car or cdr, of the list
   ;; structure of list-1 or list-2.
-  ;; see. CLHS, function nunion
+  ;; c.f. CLHS, function nunion
   (setf (bitmap intset1) (logior (bitmap intset1)
                                  (bitmap intset2)))
   intset1)
@@ -250,13 +254,13 @@ otherwise ascending-ordered-list."
   ;; MEMO: 2013-10-07
   ;; nset-exclusive-or is permitted to modify any part, car or cdr, of
   ;; the list structure of list-1 or list-2.
-  ;; see. CLHS, function nset-exclusive-or
+  ;; c.f. CLHS, function nset-exclusive-or
   (setf (bitmap intset1) (logxor (bitmap intset1)
                                  (bitmap intset2)))
   intset1)
 
 (defun intset:random (intset)
-  "intset:RANDOM intset => integer/null
+  "intset:RANDOM intset => non-negative-integer/null
 If `intset' is an empty set, it returns NIL."
   (if (emptyp intset)
       nil
@@ -270,15 +274,15 @@ If `intset' is an empty set, it returns NIL."
                   (when (logbitp i bm)
                     (incf j))))))
 
-(defun intset:map (type function intset &key (desc? nil))
-  "intset:MAP type function intset => new-object
-The argument `type' must be a one of {intset list string vector}.
-If `type' is intset, then it returns a new intset. If keyword `desc?'
+(defun intset:map (result-type function intset &key (desc? nil))
+  "intset:MAP result-type function intset &key (desc? nil) => new-object
+The argument `result-type' must be a one of {intset list string vector}.
+If `result-type' is intset, then it returns a new intset. If keyword `desc?'
 is a non-NIL, it calls `function' with descending-ordered arguments,
 otherwise ascending-ordered."
-  (check-type type     (member intset list string vector))
-  (check-type function function)
-  (if (eq type 'intset)
+  (check-type result-type (member intset list string vector))
+  (check-type function    function)
+  (if (eq result-type 'intset)
       (let ((bm (bitmap intset))
             (new-bm 0))
         (if desc?
@@ -293,10 +297,10 @@ otherwise ascending-ordered."
                               (logior new-bm
                                       (ash 2 (1- (funcall function i))))))))
         (make-new-intset new-bm))
-      (cl:map type function (intset->list intset :desc? desc?))))
+      (cl:map result-type function (intset->list intset :desc? desc?))))
 
 (defun for-each (function intset &key (desc? nil))
-  "FOR-EACH function intset => non-modified-intset
+  "FOR-EACH function intset &key (desc? nil) => non-modified-intset
 If keyword `desc?' is a non-NIL, it calls `function' with
 descending-ordered arguments, otherwise ascending-ordered."
   (check-type function function)
@@ -311,7 +315,7 @@ descending-ordered arguments, otherwise ascending-ordered."
   intset)
 
 (defun intset:max (intset)
-  "intset:MAX intset => integer/null
+  "intset:MAX intset => non-negative-integer/null
 If `intset' is an empty set, it returns NIL."
   (let ((bm (bitmap intset)))
     (if (zerop bm)
@@ -319,7 +323,7 @@ If `intset' is an empty set, it returns NIL."
         (1- (integer-length bm)))))
 
 (defun intset:min (intset)
-  "intset:MIN intset => integer/null
+  "intset:MIN intset => non-negative-integer/null
 If `intset' is an empty set, it returns NIL."
   (let ((bm (bitmap intset)))
     (if (zerop bm)
