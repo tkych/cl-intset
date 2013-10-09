@@ -1,6 +1,6 @@
-Last modified: 2013-10-09 19:12:42 tkych
+Last modified: 2013-10-09 20:48:28 tkych
 
-Version: 0.1.01 (beta)
+Version: 0.1.01
 
 
 cl-intset
@@ -48,7 +48,7 @@ Examples
     CL-REPL> (iset:intset->list iset1)
     (42)
     
-    CL-REPL> (defvar iset2 (iset:list->intset '(43 41 42)))
+    CL-REPL> (defvar iset2 (iset:list->intset '(43 41 42 43 41 42)))
     ISET2
 
     CL-REPL> (iset:intset->list iset2)
